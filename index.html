@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nuclear Chick-EN</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background: #000;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      class MainScene extends Phaser.Scene {
+        constructor() {
+          super("MainScene");
+        }
+
+        preload() {
+          this.load.image("bg", "assets/background.png");
+          this.load.image("player", "assets/player.png");
+          this.load.image("bullet", "assets/bullet.png");
+          this.load.image("enemy", "assets/enemy.png");
+          this.load.image("crate", "assets/crate.png");
+          this.load.image("health", "assets/health.png");
+          this.load.image("spark", "assets/spark.png");
+
+          this.load.image("bulletIcon", "assets/ui/ammo.png");
+
+          this.load.audio("fire", "assets/sounds/fire.mp3");
+          this.load.audio("pickup", "assets/sounds/pickup.mp3");
+          this.load.audio("reload", "assets/sounds/reload.mp3");
+          this.load.audio("hurt", "assets/sounds/hurt.mp3");
+          this.load.audio("error", "assets/sounds/error.mp3");
+          this.load.audio("blip", "assets/sounds/blip.mp3");
+          this.load.audio("rooster", "assets/sounds/rooster.mp3");
+
+          this.load.audio("bgMusic", "assets/sounds/bgMusicRooster1.mp3");
+        }
+
+        create() {
+          // Background
+          this.add.image(400, 300, "bg");
+          this.blipSound = this.sound.add("blip");
+          this.roosterSound = this.sound.add("rooster");
+
+          // Background music
+          if (!this.sound.get("bgMusic")) {
+            this.bgMusic = this.sound.add("bgMusic", {
+              loop: true,
+              volume: 1,
+            });
+            this.bgMusic.play();
+          } else {
+            this.bgMusic = this.sound.get("bgMusic");
+          }
+
+          this.errorSound = this.sound.add("error");
+
+          // Start Game Button
+          this.startText = this.add
+            .text(400, 300, "START GAME", {
+              fontSize: "32px",
+              fill: "#fff",
+              backgroundColor: "#000",
+              padding: { x: 20, y: 10 },
+            })
+            .setOrigin(0.5)
+            .setInteractive();
+
+          // Shared start logic
+          const startGame = () => {
+            this.blipSound.play();
+            this.roosterSound.play();
+            this.startGame();
+            this.updateAmmoIcons();
+          };
+
+          // Start on mouse click
+          this.startText.on("pointerdown", startGame);
+
+          // Start on Enter key press
+          this.input.keyboard.on("keydown-ENTER", startGame);
+
+          // Add enemy spawn timer
+          this.time.addEvent({
+            delay: 2000,
+            callback: this.spawnEnemy,
+            callbackScope: this,
+            loop: true,
+          });
+
+          // Shoot with mouse click
+          this.input.on("pointerdown", (pointer) => {
+            if (
+              pointer.leftButtonDown() &&
+              this.time.now > this.lastFired &&
+              this.ammo > 0
+            ) {
+              this.shootBulletAt(pointer.worldX, pointer.worldY);
+            }
+          });
+
+          // Game Objects (Initially hidden/inactive)
+          this.player = this.physics.add
+            .sprite(400, 300, "player")
+            .setVisible(false);
+          this.player.setCollideWorldBounds(true);
+
+          this.bullets = this.physics.add.group();
+          this.enemies = this.physics.add.group();
+          this.crates = this.physics.add.group();
+          this.healths = this.physics.add.group({
+            defaultKey: "health",
+            runChildUpdate: true,
+          });
+
+          this.cursors = this.input.keyboard.createCursorKeys();
+          this.spaceBar = this.input.keyboard.addKey(
+            Phaser.Input.Keyboard.KeyCodes.SPACE
+          );
+
+          this.fireSound = this.sound.add("fire");
+          this.pickupSound = this.sound.add("pickup");
+          this.reloadSound = this.sound.add("reload");
+          this.hurtSound = this.sound.add("hurt");
+
+          this.lastFired = 0;
+          this.ammo = 10;
+          this.health = 100;
+          this.score = 0;
+
+          this.bulletSpeed = 1400; // or 700–1000 for extra speed
+
+          // Text for debugging UI
+          /* this.ammoText = this.add
+            .text(10, 10, "Ammo: 10", {
+              fontSize: "16px",
+              fill: "#fff",
+            })
+            .setVisible(false);
+          this.healthText = this.add
+            .text(10, 30, "Health: 100", {
+              fontSize: "16px",
+              fill: "#fff",
+            })
+            .setVisible(false); */
+          this.scoreText = this.add.text(15, 22, "Score: 0", {
+            fontSize: "16px",
+            fill: "#fff",
+          });
+
+          this.gameStarted = false;
+
+          // Waves
+          this.wave = 1;
+          this.enemiesPerWave = 5;
+          this.enemiesSpawned = 0;
+          this.waveCooldown = false;
+          this.waveKills = 0; // Enemies killed in this wave
+          this.enemiesToKill = 10; // How many enemies must die to advance wave
+          this.waveText = this.add.text(15, 570, "Wave: 1", {
+            fontSize: "16px",
+            fill: "#fff",
+          });
+
+          this.enemyBaseSpeed = 100;
+          this.enemyMaxSpeed = 400;
+
+          this.enemySpawnRate = 1000; // initial delay in ms
+          this.enemySpawnTimer = this.time.addEvent({
+            delay: this.enemySpawnRate,
+            callback: this.spawnEnemy,
+            callbackScope: this,
+            loop: true,
+          });
+
+          this.crateSpawnDelay = 5000; // Initial delay in ms
+
+          this.crateSpawnEvent = this.time.addEvent({
+            delay: this.crateSpawnDelay,
+            callback: this.spawnCrate,
+            callbackScope: this,
+            loop: true,
+          });
+
+          // Health Bar
+          this.maxHealth = 100;
+          this.healthIcons = [];
+
+          const healthIconCount = this.maxHealth / 20; // 100 health = 5 icons
+          for (let i = 0; i < healthIconCount; i++) {
+            const icon = this.add
+              .image(25 + i * 26, 61, "health") // Adjust position if needed
+              .setScale(0.4)
+              .setAlpha(1)
+              .setVisible(i < this.health / 20);
+
+            this.healthIcons.push(icon);
+          }
+
+          // Ammo
+          this.ammoIcons = [];
+          this.maxAmmo = 30;
+
+          for (let i = 0; i < this.maxAmmo; i++) {
+            let icon = this.add
+              .image(
+                22 + (i % 15) * 18,
+                91 + Math.floor(i / 15) * 18, //<!-- Adjusted Y position -->
+                "bullet"
+              )
+              .setScale(0.5);
+
+            // Color tinting based on index
+            if (i < 5) {
+              icon.setTint(0xff0000); // Red
+            } else if (i < 10) {
+              icon.setTint(0xffff00); // Yellow
+            } else {
+              icon.setTint(0x00ff00); // Green
+            }
+
+            icon.setVisible(i < this.ammo);
+            this.ammoIcons.push(icon);
+          }
+        }
+
+        //Update health icons
+        updateHealthIcons() {
+          const heartsToShow = Math.ceil(this.health / 20);
+
+          for (let i = 0; i < this.healthIcons.length; i++) {
+            const icon = this.healthIcons[i];
+
+            if (i < heartsToShow) {
+              if (!icon.visible && i === heartsToShow - 1) {
+                icon.setVisible(true);
+                icon.setAlpha(0);
+                icon.setScale(0);
+                this.tweens.add({
+                  targets: icon,
+                  alpha: 1,
+                  scale: 0.6,
+                  duration: 200,
+                  ease: "Back.Out",
+                });
+              } else {
+                icon.setVisible(true);
+                icon.setAlpha(1);
+                icon.setScale(0.6);
+              }
+            } else {
+              if (icon.visible && i === heartsToShow) {
+                this.tweens.add({
+                  targets: icon,
+                  alpha: 0,
+                  scale: 0,
+                  duration: 150,
+                  ease: "Back.In",
+                  onComplete: () => {
+                    icon.setVisible(false);
+                  },
+                });
+              } else {
+                icon.setVisible(false);
+                icon.setAlpha(1);
+                icon.setScale(0.6);
+              }
+            }
+          }
+        }
+
+        // Update ammo icons
+        updateAmmoIcons() {
+          for (let i = 0; i < this.maxAmmo; i++) {
+            const icon = this.ammoIcons[i];
+
+            if (i < this.ammo) {
+              if (!icon.visible && i === this.ammo - 1) {
+                // Animate the new last icon turned ON
+                icon.setVisible(true);
+                icon.setAlpha(0);
+                icon.setScale(0);
+                this.tweens.add({
+                  targets: icon,
+                  alpha: 1,
+                  scale: 0.5,
+                  duration: 200,
+                  ease: "Back.Out",
+                });
+              } else {
+                // Instantly show others
+                icon.setVisible(true);
+                icon.setAlpha(1);
+                icon.setScale(0.5);
+              }
+            } else {
+              if (icon.visible && i === this.ammo) {
+                // Animate the last icon turned OFF
+                this.tweens.add({
+                  targets: icon,
+                  alpha: 0,
+                  scale: 0,
+                  duration: 150,
+                  ease: "Back.In",
+                  onComplete: () => {
+                    icon.setVisible(false);
+                  },
+                });
+              } else {
+                icon.setVisible(false);
+                icon.setAlpha(1);
+                icon.setScale(0.5);
+              }
+            }
+          }
+        }
+
+        // Floating text
+        showFloatingText(x, y, text, color = "#ffffff") {
+          const label = this.add.text(x, y, text, {
+            font: "bold 24px Arial",
+            fill: color,
+            stroke: "#000000",
+            strokeThickness: 4,
+            align: "center",
+          });
+          label.setOrigin(0.5);
+          label.setDepth(20);
+
+          this.tweens.add({
+            targets: label,
+            y: y - 40,
+            alpha: 0,
+            duration: 1000,
+            ease: "Cubic.easeOut",
+            onComplete: () => {
+              label.destroy();
+            },
+          });
+        }
+
+        shootBulletAt(targetX, targetY) {
+          const bullet = this.bullets.create(
+            this.player.x,
+            this.player.y,
+            "bullet"
+          );
+
+          const angle = Phaser.Math.Angle.Between(
+            this.player.x,
+            this.player.y,
+            targetX,
+            targetY
+          );
+
+          bullet.setVelocity(
+            Math.cos(angle) * this.bulletSpeed,
+            Math.sin(angle) * this.bulletSpeed
+          );
+
+          bullet.setScale(0.8);
+          this.fireSound.play();
+          this.lastFired = this.time.now + 500;
+          this.ammo--;
+          //this.ammoText.setText("Ammo: " + this.ammo); //Debbuging
+          this.updateAmmoIcons();
+        }
+
+        startGame() {
+          this.startText.destroy();
+          this.gameStarted = true;
+
+          // Clear any enemies already on screen
+          this.enemies.clear(true, true);
+
+          // Show UI
+          this.player.setVisible(true);
+          //this.ammoText.setVisible(true); //Debbuging
+          //this.healthText.setVisible(true); //Debbuging
+          this.scoreText.setVisible(true);
+
+          // Crate & health spawn loops
+          this.time.addEvent({
+            delay: 5000,
+            callback: this.spawnCrate,
+            callbackScope: this,
+            loop: true,
+          });
+
+          this.time.addEvent({
+            delay: 8000,
+            callback: this.spawnHealth,
+            callbackScope: this,
+            loop: true,
+          });
+
+          // Setup collisions
+          this.physics.add.overlap(
+            this.bullets,
+            this.enemies,
+            this.bulletHitsEnemy,
+            null,
+            this
+          );
+          this.physics.add.overlap(
+            this.player,
+            this.enemies,
+            this.enemyHitsPlayer,
+            null,
+            this
+          );
+          this.physics.add.overlap(
+            this.player,
+            this.crates,
+            this.collectCrate,
+            null,
+            this
+          );
+          this.physics.add.overlap(
+            this.player,
+            this.healths,
+            this.collectHealth,
+            null,
+            this
+          );
+        }
+
+        // Shooting
+        update(time, delta) {
+          if (!this.gameStarted) return;
+
+          // Movement and flipping
+          if (this.cursors.left.isDown) {
+            this.player.setVelocityX(-200);
+            this.player.setFlipX(true); // Face left
+          } else if (this.cursors.right.isDown) {
+            this.player.setVelocityX(200);
+            this.player.setFlipX(false); // Face right
+          } else {
+            this.player.setVelocityX(0);
+          }
+
+          if (this.cursors.up.isDown) {
+            this.player.setVelocityY(-200);
+          } else if (this.cursors.down.isDown) {
+            this.player.setVelocityY(200);
+          } else {
+            this.player.setVelocityY(0);
+          }
+
+          this.shootBullet(time);
+        }
+
+        shootBullet(time) {
+          if (time < this.lastFired || this.ammo <= 0) return;
+
+          let targetX, targetY;
+
+          // Mouse click
+          if (this.input.activePointer.isDown) {
+            targetX = this.input.activePointer.worldX;
+            targetY = this.input.activePointer.worldY;
+          }
+          // Spacebar + movement keys
+          else if (this.spaceBar.isDown) {
+            let dirX = 0;
+            let dirY = 0;
+
+            if (this.cursors.up.isDown) dirY = -1;
+            else if (this.cursors.down.isDown) dirY = 1;
+
+            if (this.cursors.left.isDown) dirX = -1;
+            else if (this.cursors.right.isDown) dirX = 1;
+
+            // If no movement input, don't fire
+            if (dirX === 0 && dirY === 0) return;
+
+            // Normalize direction vector
+            const mag = Math.sqrt(dirX * dirX + dirY * dirY);
+            dirX /= mag;
+            dirY /= mag;
+
+            targetX = this.player.x + dirX * 100;
+            targetY = this.player.y + dirY * 100;
+          } else {
+            return; // Neither mouse nor spacebar pressed
+          }
+
+          const dx = targetX - this.player.x;
+          const dy = targetY - this.player.y;
+          const angle = Math.atan2(dy, dx);
+          const speed = 800; // Adjusted for visibility and power
+
+          const bullet = this.bullets.create(
+            this.player.x,
+            this.player.y,
+            "bullet"
+          );
+          bullet.setScale(0.8);
+          bullet.setDepth(5);
+          bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+          bullet.rotation = angle;
+
+          this.fireSound.play();
+          this.lastFired = time + 250; // Faster shooting feel
+          this.ammo--;
+          //this.ammoText.setText("Ammo: " + this.ammo); //Debbuging
+          this.updateAmmoIcons();
+        }
+
+        spawnEnemy() {
+          if (!this.gameStarted) return; // Prevent spawning if game hasn't started
+
+          const side = Phaser.Math.Between(0, 3);
+          let x, y;
+
+          if (side === 0) {
+            x = Phaser.Math.Between(0, this.game.config.width);
+            y = 0;
+          } else if (side === 1) {
+            x = this.game.config.width;
+            y = Phaser.Math.Between(0, this.game.config.height);
+          } else if (side === 2) {
+            x = Phaser.Math.Between(0, this.game.config.width);
+            y = this.game.config.height;
+          } else {
+            x = 0;
+            y = Phaser.Math.Between(0, this.game.config.height);
+          }
+
+          const enemy = this.enemies.create(x, y, "enemy");
+
+          const randomScale = Phaser.Math.FloatBetween(0.3, 0.8);
+          enemy.setScale(randomScale);
+
+          const dx = this.player.x - x;
+          const dy = this.player.y - y;
+          const angle = Math.atan2(dy, dx);
+
+          const speed = Math.min(
+            this.enemyBaseSpeed + this.score * 2,
+            this.enemyMaxSpeed
+          );
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+
+          enemy.setVelocity(vx, vy);
+        }
+
+        spawnCrate() {
+          if (this.ammo >= this.maxAmmo) return; // Skip spawning if ammo is full
+
+          const x = Phaser.Math.Between(50, 750);
+          const y = Phaser.Math.Between(50, 550);
+          const crate = this.crates.create(x, y, "crate");
+          crate.setScale(1);
+          crate.setImmovable(true);
+          crate.body.allowGravity = false;
+          crate.setVelocity(0);
+
+          const sizes = [0.5, 0.6, 0.7, 0.8, 0.6, 0.7, 0.5];
+          const tints = [
+            0xffffff, 0xffaaaa, 0xff8888, 0xff6666, 0xff8888, 0xffaaaa,
+            0xffffff,
+          ];
+          let i = 0;
+
+          let crateLifetime = 5000; // Total lifetime in ms (5 seconds)
+          let elapsed = 0;
+
+          const animEvent = this.time.addEvent({
+            delay: 150,
+            loop: true,
+            callback: () => {
+              if (!crate.active) {
+                animEvent.remove();
+                return;
+              }
+
+              crate.setScale(sizes[i]);
+              crate.setTint(tints[i]);
+              i = (i + 1) % sizes.length;
+
+              // Update time and check expiration
+              elapsed += animEvent.delay;
+
+              if (elapsed >= crateLifetime) {
+                crate.destroy(); // Crate disappears
+                animEvent.remove();
+                return;
+              }
+
+              // Speed up animation as crate expires
+              const remaining = crateLifetime - elapsed;
+              animEvent.delay = Phaser.Math.Clamp(
+                (remaining / crateLifetime) * 150,
+                40,
+                150
+              );
+            },
+          });
+        }
+
+        spawnHealth() {
+          if (this.health >= 100) return; // Player is already full health
+
+          if (this.healths.countActive(true) > 0) return; // Health pack already exists
+
+          const x = Phaser.Math.Between(50, 750);
+          const y = Phaser.Math.Between(50, 550);
+          const health = this.healths.create(x, y, "health");
+          health.setScale(1);
+          health.setImmovable(true);
+          health.body.allowGravity = false;
+          health.setVelocity(0);
+
+          const sizes = [0.5, 0.6, 0.7, 0.8, 0.6, 0.7, 0.5];
+          const tints = [
+            0xffffff, 0xaaffaa, 0x88ff88, 0x66ff66, 0x88ff88, 0xaaffaa,
+            0xffffff,
+          ];
+          let i = 0;
+
+          let healthLifetime = 5000; // total lifetime in ms (5 seconds)
+          let elapsed = 0;
+
+          const animEvent = this.time.addEvent({
+            delay: 150,
+            loop: true,
+            callback: () => {
+              if (!health.active) {
+                animEvent.remove();
+                return;
+              }
+
+              health.setScale(sizes[i]);
+              health.setTint(tints[i]);
+              i = (i + 1) % sizes.length;
+
+              elapsed += animEvent.delay;
+
+              if (elapsed >= healthLifetime) {
+                health.destroy(); // Remove health pack if not picked up
+                animEvent.remove();
+                return;
+              }
+
+              // Speed up animation as time runs out
+              const remaining = healthLifetime - elapsed;
+              animEvent.delay = Phaser.Math.Clamp(
+                (remaining / healthLifetime) * 150,
+                40,
+                150
+              );
+            },
+          });
+        }
+
+        bulletHitsEnemy(bullet, enemy) {
+          bullet.destroy();
+          enemy.destroy();
+
+          this.score += 10;
+          this.scoreText.setText("Score: " + this.score);
+
+          // Track kills toward current wave
+          this.waveKills++;
+          if (this.waveKills >= this.enemiesToKill) {
+            this.advanceWave();
+          }
+
+          // Adjust spawn speed every 50 points
+          if (this.score % 50 === 0) {
+            this.enemySpawnRate = Math.max(300, this.enemySpawnRate - 100);
+
+            // Adjust crate spawn delay (max 15s, min 3s)
+            this.crateSpawnDelay = Phaser.Math.Clamp(
+              5000 + this.score * 100,
+              3000,
+              30000
+            );
+            this.crateSpawnEvent.delay = this.crateSpawnDelay;
+
+            this.enemySpawnTimer.remove(false); // remove old timer
+            this.enemySpawnTimer = this.time.addEvent({
+              delay: this.enemySpawnRate,
+              callback: this.spawnEnemy,
+              callbackScope: this,
+              loop: true,
+            });
+          }
+        }
+
+        advanceWave() {
+          this.wave++;
+          this.waveKills = 0;
+
+          // Increase enemy count needed for next wave
+          this.enemiesToKill = 10 + Math.floor(this.wave * 1.5);
+
+          this.waveText.setText("Wave: " + this.wave);
+
+          // Optional difficulty scaling:
+          this.enemySpawnRate = Math.max(300, this.enemySpawnRate - 50);
+          this.enemySpawnTimer.remove(false);
+          this.enemySpawnTimer = this.time.addEvent({
+            delay: this.enemySpawnRate,
+            callback: this.spawnEnemy,
+            callbackScope: this,
+            loop: true,
+          });
+
+          // Optionally: add visual/sound cue for wave change
+        }
+
+        enemyHitsPlayer(player, enemy) {
+          enemy.destroy();
+          this.health -= 20;
+          this.hurtSound.play();
+          //this.healthText.setText("Health: " + this.health); //Debbuging
+          this.updateHealthIcons();
+
+          // Spark effect at the health item's position
+          /* const spark = this.add.sprite(health.x, health.y, "spark");
+          spark.setOrigin(0.5);
+          spark.setDepth(10); // Ensure it renders on top
+          spark.setBlendMode(Phaser.BlendModes.ADD);
+ */
+          // === Flash screen slightly like fireworks ===
+          this.cameras.main.flash(150, 255, 100, 100, false);
+
+          // === Shake the camera when the player is hit ===
+          this.cameras.main.shake(150, 0.01); // Shake for 150ms with intensity of 0.01
+
+          if (this.health <= 0) {
+            this.scene.restart();
+          }
+        }
+
+        collectCrate(player, crate) {
+          crate.destroy();
+
+          if (this.ammo < this.maxAmmo) {
+            this.ammo += 5;
+
+            if (this.ammo >= this.maxAmmo) {
+              this.ammo = this.maxAmmo;
+              this.showFloatingText(
+                crate.x,
+                crate.y - 20,
+                "Ammo Full!",
+                "#ffff66"
+              );
+            } else {
+              this.showFloatingText(crate.x, crate.y - 20, "+5", "#ffff66");
+            }
+
+            this.reloadSound.play();
+            //this.ammoText.setText("Ammo: " + this.ammo); //Debbuging
+            this.updateAmmoIcons();
+
+            const spark = this.add.sprite(crate.x, crate.y, "spark");
+            spark.setOrigin(0.5);
+            spark.setDepth(10);
+            spark.setBlendMode(Phaser.BlendModes.ADD);
+
+            this.tweens.add({
+              targets: spark,
+              scale: { from: 1, to: 2 },
+              alpha: { from: 1, to: 0 },
+              tint: { from: 0xffffff, to: 0xff44ff },
+              duration: 600,
+              ease: "Sine.easeOut",
+              yoyo: false,
+              onComplete: () => {
+                spark.destroy();
+              },
+            });
+          } else {
+            this.errorSound.play();
+            this.showFloatingText(
+              crate.x,
+              crate.y - 20,
+              "Ammo Full!",
+              "#ff6666"
+            );
+          }
+        }
+
+        collectHealth(player, health) {
+          // Destroy the health item
+          health.destroy();
+
+          if (this.health >= 100) {
+            health.destroy();
+            this.errorSound.play();
+            this.showFloatingText(health.x, health.y, "Health Full!");
+            return;
+          }
+
+          // Clamp health increase
+          this.health += 20;
+          if (this.health >= 100) {
+            this.health = 100;
+            this.showFloatingText(
+              health.x,
+              health.y - 20,
+              "Full Health",
+              "#ff6666"
+            );
+          } else {
+            this.showFloatingText(health.x, health.y - 20, "+20", "#88ff88");
+          }
+          this.updateHealthIcons();
+
+          // Play pickup sound
+          this.pickupSound.play();
+          //this.healthText.setText("Health: " + this.health); //Debbuging
+
+          // Spark effect at the health item's position
+          const spark = this.add.sprite(health.x, health.y, "spark");
+          spark.setOrigin(0.5);
+          spark.setDepth(10); // Ensure it renders on top
+          spark.setBlendMode(Phaser.BlendModes.ADD);
+
+          // === Flash screen slightly like fireworks ===
+          this.cameras.main.flash(150, 100, 100, 255, false);
+
+          // Animate the spark
+          this.tweens.add({
+            targets: spark,
+            scale: { from: 1, to: 2 },
+            alpha: { from: 1, to: 0 },
+            tint: { from: 0xffffff, to: 0xff44ff },
+            duration: 600,
+            ease: "Sine.easeOut",
+            yoyo: false,
+            onComplete: () => {
+              spark.destroy();
+            },
+          });
+        }
+      }
+
+      const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+          default: "arcade",
+          arcade: {
+            gravity: { y: 0 },
+            debug: false,
+          },
+        },
+        scene: MainScene,
+      };
+
+      new Phaser.Game(config);
+    </script>
+  </body>
+</html>
