@@ -148,6 +148,8 @@
     </main>
 
     <script>
+      let menuIntroMusic = null;
+      let bgMusic = null;
       class MainScene extends Phaser.Scene {
         constructor() {
           super("MainScene");
@@ -175,6 +177,7 @@
           this.load.audio("rooster", "assets/sounds/rooster.mp3");
 
           this.load.audio("bgMusic", "assets/sounds/bgMusicRooster1.mp3");
+          this.load.audio("menuIntro", "assets/sounds/introMusic.mp3");
         }
 
         create() {
@@ -195,15 +198,13 @@
           this.tombstone = null;
           this.tombstoneExploded = false; // Flag to prevent multiple explosions
 
-          // Background music
-          if (!this.sound.get("bgMusic")) {
-            this.bgMusic = this.sound.add("bgMusic", {
+          // Menu Intro Music
+          if (!menuIntroMusic || !menuIntroMusic.isPlaying) {
+            menuIntroMusic = this.sound.add("menuIntro", {
               loop: true,
               volume: 1,
             });
-            this.bgMusic.play();
-          } else {
-            this.bgMusic = this.sound.get("bgMusic");
+            menuIntroMusic.play();
           }
 
           this.errorSound = this.sound.add("error");
@@ -227,11 +228,13 @@
             this.updateAmmoIcons();
           };
 
-          // Start on mouse click
           this.startText.on("pointerdown", startGame);
 
-          // Start on Enter key press
-          this.input.keyboard.on("keydown-ENTER", startGame);
+          // ✅ Register ENTER here, after UI is visible
+          this.input.keyboard.once("keydown-ENTER", startGame);
+
+          // Start on mouse click
+          this.startText.on("pointerdown", startGame);
 
           this.wasd = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -395,7 +398,7 @@
             this.ammoIcons.push(icon);
           }
         }
-        d;
+
         // Create afterimage effect
         createAfterimage() {
           const img = this.add.image(this.player.x, this.player.y, "player");
@@ -533,8 +536,18 @@
         }
 
         showGameOver(finalScore) {
+          // Stop background game music
+          if (bgMusic && bgMusic.isPlaying) {
+            bgMusic.stop();
+          }
+
+          // Restart menu music if not already playing
+          if (menuIntroMusic && !menuIntroMusic.isPlaying) {
+            menuIntroMusic.play();
+          }
+
           const panel = this.add
-            .rectangle(400, 300, 500, 200, 0x000000, 0.3) //Last number is the alpha
+            .rectangle(400, 300, 500, 200, 0x000000, 0.3)
             .setOrigin(0.5)
             .setDepth(10);
 
@@ -560,15 +573,18 @@
             .setOrigin(0.5)
             .setDepth(10);
 
-          // Prevent instant restart via mouse by adding delay
+          // Prevent accidental double-trigger
           this.time.delayedCall(1000, () => {
-            // Allow restart via ENTER
+            this.input.keyboard.removeAllListeners("keydown-ENTER");
+            this.input.removeAllListeners("pointerdown");
+
             this.input.keyboard.once("keydown-ENTER", () => {
+              if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
               this.scene.restart();
             });
 
-            // Allow restart via mouse click
             this.input.once("pointerdown", () => {
+              if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
               this.scene.restart();
             });
           });
@@ -605,6 +621,18 @@
         startGame() {
           this.startText.destroy();
           this.gameStarted = true;
+          // Stop menu intro music if it's playing
+          if (menuIntroMusic && menuIntroMusic.isPlaying) {
+            menuIntroMusic.stop();
+          }
+          if (!bgMusic || !bgMusic.isPlaying) {
+            bgMusic = this.sound.add("bgMusic", {
+              loop: true,
+              volume: 1,
+            });
+            bgMusic.play();
+          }
+
           this.startTime = this.time.now;
 
           // Clear any enemies already on screen
@@ -657,6 +685,22 @@
             this.player,
             this.healths,
             this.collectHealth,
+            null,
+            this
+          );
+
+          // Bullet vs Items detection
+          this.physics.add.overlap(
+            this.bullets,
+            this.healths,
+            this.bulletCollectsHealth,
+            null,
+            this
+          );
+          this.physics.add.overlap(
+            this.bullets,
+            this.crates,
+            this.bulletCollectsCrate,
             null,
             this
           );
@@ -1076,6 +1120,7 @@
           }
         }
 
+        //Item Collection
         collectCrate(player, crate) {
           crate.destroy();
 
@@ -1178,6 +1223,16 @@
               spark.destroy();
             },
           });
+        }
+
+        bulletCollectsHealth(bullet, health) {
+          bullet.destroy();
+          this.collectHealth(this.player, health);
+        }
+
+        bulletCollectsCrate(bullet, crate) {
+          bullet.destroy();
+          this.collectCrate(this.player, crate);
         }
       }
 
