@@ -121,13 +121,18 @@
           </li>
           <li>
             <img src="assets/bullet.png" alt="Bullet icon" />
-            <span>Shoot with Spacebar or Mouse</span>
+            <span>Shoot with the Spacebar<br> or Right-Click Mouse</span>
           </li>
           <li>
             <img src="assets/player.png" alt="Health icon" />
             <span> Press CTRL to dash</span>
           </li>
           <li>
+            <li>
+              <img src="assets/music.png" alt="Health icon" />
+              <span> Press P to switch the music or M to mute!</span>
+            </li>
+            <li>
             <img src="assets/health.png" alt="Health icon" />
             <span>Pick up health packs</span>
           </li>
@@ -148,8 +153,11 @@
     </main>
 
     <script>
-      let menuIntroMusic = null;
       let bgMusic = null;
+      let menuIntroMusic = null;
+      let allTracks = [];
+      let currentTrackIndex = 0;
+      let musicMuted = false;
       class MainScene extends Phaser.Scene {
         constructor() {
           super("MainScene");
@@ -164,6 +172,9 @@
           this.load.image("health", "assets/health.png");
           this.load.image("spark", "assets/spark.png");
           this.load.image("tombstone", "assets/tombstone.png");
+          this.load.image("aim", "assets/cursor_aim.png");
+
+          this.load.image("logo", "assets/ui/logoFinal.png");
 
           this.load.image("bulletIcon", "assets/ui/ammo.png");
 
@@ -176,16 +187,189 @@
           this.load.audio("dash", "assets/sounds/dash.mp3");
           this.load.audio("rooster", "assets/sounds/rooster.mp3");
 
-          this.load.audio("bgMusic", "assets/sounds/bgMusicRooster1.mp3");
           this.load.audio("menuIntro", "assets/sounds/introMusic.mp3");
+
+          // Soundtrack Music
+          this.load.audio("bgMusic", "assets/sounds/bgMusicRooster1.mp3");
+          this.load.audio("bgMusic2", "assets/sounds/bgMusicRooster2.mp3");
+          this.load.audio("bgMusic3", "assets/sounds/bgMusicRooster3.mp3");
+          this.load.audio("bgMusic4", "assets/sounds/bgMusicRooster4.mp3");
+          this.load.audio("bgMusic5", "assets/sounds/bgMusicRooster5.mp3");
+          this.load.audio("bgMusic6", "assets/sounds/bgMusicRooster6.mp3");
+          this.load.audio("bgMusic7", "assets/sounds/bgMusicRooster7.mp3");
+          this.load.audio("bgMusic8", "assets/sounds/bgMusicRooster8.mp3");
         }
 
         create() {
+          this.input.setDefaultCursor("url(assets/ui/cursor_aim.png), pointer");
+
+          this.isInvincible = false;
+
           // Background
           this.add.image(400, 300, "bg");
           this.dashSound = this.sound.add("dash");
           this.blipSound = this.sound.add("blip");
           this.roosterSound = this.sound.add("rooster");
+          // Soundtrack
+          allTracks = [
+            { key: "bgMusic", name: "Cutesy Fartsy Eggsy!" },
+            { key: "bgMusic2", name: "If Kirby Had Eggs" },
+            { key: "bgMusic3", name: "ZZ Rost" },
+            { key: "bgMusic4", name: "EggCDC" },
+            { key: "bgMusic5", name: "RoosterVania" },
+            { key: "bgMusic6", name: "Polkasroostinski" },
+            { key: "bgMusic7", name: "Kinda Animeish... PocPooc!!!" },
+            { key: "bgMusic8", name: "For The Chicks" },
+          ];
+
+          // add your track keys
+          currentTrackIndex = 0; // default track
+
+          // Optional: display current track
+          this.trackLabel = this.add
+            .text(400, 20, "", {
+              fontSize: "14px",
+              fill: "#aaa",
+            })
+            .setOrigin(0.5)
+            .setVisible(false)
+            .setAlpha(0);
+
+          this.input.keyboard.on("keydown-P", () => {
+            if (!this.gameStarted) return;
+
+            // Increment and loop back to start
+            currentTrackIndex = (currentTrackIndex + 1) % allTracks.length;
+
+            // Stop and destroy the current music safely
+            if (bgMusic) {
+              bgMusic.stop();
+              bgMusic.destroy();
+              bgMusic = null;
+            }
+
+            // Get the selected track
+            const selectedTrack = allTracks[currentTrackIndex];
+
+            // Add and play the new track
+            bgMusic = this.sound.add(selectedTrack.key, {
+              loop: true,
+              volume: musicMuted ? 0 : 1,
+            });
+            bgMusic.play();
+
+            this.showTrackLabel(selectedTrack.name);
+          });
+
+          this.input.keyboard.on("keydown-M", () => {
+            musicMuted = !musicMuted;
+
+            if (bgMusic) {
+              bgMusic.setVolume(musicMuted ? 0 : 1);
+            }
+
+            if (menuIntroMusic) {
+              menuIntroMusic.setVolume(musicMuted ? 0 : 1);
+            }
+          });
+
+          // Logo Image
+          // Add logo image centered on screen
+          this.logo = this.add
+            .image(400, 300, "logo")
+            .setOrigin(0.5)
+            .setScale(0.75)
+            .setDepth(100); // ✅ ensure logo is always on top
+
+          this.tweens.add({
+            targets: this.logo,
+            scaleX: 0.78, // slight pulse up from 0.75
+            scaleY: 0.78,
+            ease: "Sine.easeInOut",
+            duration: 800,
+            yoyo: true,
+            repeat: -1, // loop forever
+          });
+
+          // Add START GAME text button centered on the logo
+          const logoX = this.logo ? this.logo.x : 400;
+          const logoY = this.logo ? this.logo.y : 300;
+          this.startText = this.add
+            .text(this.logo.x, this.logo.y, "START GAME", {
+              fontSize: "32px",
+              fill: "#ffff00",
+              stroke: "#000",
+              strokeThickness: 20,
+              backgroundColor: null,
+              padding: { x: 30, y: 15 },
+              fontFamily: "Arial",
+              shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: "#fff",
+                blur: 6,
+                fill: true,
+              },
+            })
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(101);
+          this.tweens.add({
+            targets: this.startText,
+            scaleX: 1.05, // gentle scale
+            scaleY: 1.05,
+            ease: "Sine.easeInOut",
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+          });
+
+          // Hover START GAME → animate both logo and button
+          this.startText.on("pointerover", () => {
+            // Button grows
+            this.tweens.add({
+              targets: this.startText,
+              scaleX: 1.1,
+              scaleY: 1.1,
+              duration: 150,
+              ease: "Power2",
+            });
+
+            // Logo pulses slightly
+            this.tweens.add({
+              targets: this.logo,
+              scaleX: 0.8,
+              scaleY: 0.8,
+              duration: 150,
+              ease: "Power2",
+            });
+          });
+
+          this.startText.on("pointerout", () => {
+            // Button returns to normal
+            this.tweens.add({
+              targets: this.startText,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 150,
+              ease: "Power2",
+            });
+
+            // Logo returns to original scale
+            this.tweens.add({
+              targets: this.logo,
+              scaleX: 0.75,
+              scaleY: 0.75,
+              duration: 150,
+              ease: "Power2",
+            });
+          });
+
+          // Optional: Add pointer event
+          this.startText.on("pointerdown", () => {
+            this.startGame();
+          });
+
           this.startTime = 0; // Initialize start time
           this.playerSpeed = 300; // You can adjust this to your liking for player speed
 
@@ -209,17 +393,6 @@
 
           this.errorSound = this.sound.add("error");
 
-          // Start Game Button
-          this.startText = this.add
-            .text(400, 300, "START GAME", {
-              fontSize: "32px",
-              fill: "#fff",
-              backgroundColor: "#000",
-              padding: { x: 20, y: 10 },
-            })
-            .setOrigin(0.5)
-            .setInteractive();
-
           // Shared start logic
           const startGame = () => {
             this.blipSound.play();
@@ -227,8 +400,6 @@
             this.startGame();
             this.updateAmmoIcons();
           };
-
-          this.startText.on("pointerdown", startGame);
 
           // ✅ Register ENTER here, after UI is visible
           this.input.keyboard.once("keydown-ENTER", startGame);
@@ -245,7 +416,7 @@
 
           //Dash Mechanic
           this.dashSpeed = 600; // Dash burst speed
-          this.dashDuration = 200; // Duration of dash in ms
+          this.dashDuration = 300; // Duration of dash in ms
           this.dashCooldown = 1000; // Cooldown in ms
           this.isDashing = false;
           this.lastDashTime = 0;
@@ -318,7 +489,7 @@
               fill: "#fff",
             })
             .setVisible(false); */
-          this.scoreText = this.add.text(15, 22, "Score: 0", {
+          this.scoreText = this.add.text(15, 50, "Score: 0", {
             fontSize: "16px",
             fill: "#fff",
           });
@@ -364,7 +535,7 @@
           const healthIconCount = this.maxHealth / 20; // 100 health = 5 icons
           for (let i = 0; i < healthIconCount; i++) {
             const icon = this.add
-              .image(25 + i * 26, 61, "health") // Adjust position if needed
+              .image(25 + i * 26, 30, "health") // Adjust position if needed
               .setScale(0.4)
               .setAlpha(1)
               .setVisible(i < this.health / 20);
@@ -379,8 +550,8 @@
           for (let i = 0; i < this.maxAmmo; i++) {
             let icon = this.add
               .image(
-                22 + (i % 15) * 18,
-                91 + Math.floor(i / 15) * 18, //<!-- Adjusted Y position -->
+                525 + (14 - (i % 15)) * 18, // ← X position reversed
+                34 + Math.floor(i / 15) * 18, // Y stays the same
                 "bullet"
               )
               .setScale(0.5);
@@ -417,6 +588,38 @@
             onComplete: () => {
               img.destroy();
             },
+          });
+        }
+
+        showTrackLabel(name) {
+          if (!this.trackLabel) return;
+
+          this.trackLabel.setText(`Track: ${name}`);
+          this.trackLabel.setAlpha(1);
+          this.trackLabel.setVisible(true);
+          this.trackLabel.x = 400; // reset to center
+
+          // Cancel any existing tween to avoid stacking
+          if (this.trackLabelFade) {
+            this.trackLabelFade.remove();
+          }
+
+          // Start fade out with vibration after delay
+          this.trackLabelFade = this.time.delayedCall(3000, () => {
+            this.tweens.add({
+              targets: this.trackLabel,
+              alpha: 0,
+              duration: 800,
+              ease: "Sine.easeInOut",
+              onUpdate: (tween, target) => {
+                // Vibrate side to side based on tween progress
+                target.x = 400 + Math.sin(tween.progress * Math.PI * 12) * 4;
+              },
+              onComplete: (tween, targets) => {
+                targets[0].setVisible(false);
+                targets[0].x = 400;
+              },
+            });
           });
         }
 
@@ -536,53 +739,84 @@
         }
 
         showGameOver(finalScore) {
-          // Stop background game music
-          if (bgMusic && bgMusic.isPlaying) {
-            bgMusic.stop();
-          }
-
-          // Restart menu music if not already playing
-          if (menuIntroMusic && !menuIntroMusic.isPlaying) {
+          // Stop game music and resume menu music
+          if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
+          if (menuIntroMusic && !menuIntroMusic.isPlaying)
             menuIntroMusic.play();
-          }
 
+          // Dark blurred panel
           const panel = this.add
-            .rectangle(400, 300, 500, 200, 0x000000, 0.3)
+            .rectangle(400, 300, 500, 220, 0x000, 0.75)
             .setOrigin(0.5)
-            .setDepth(10);
+            .setDepth(10)
+            .setStrokeStyle(3, 0xfdf77b); // Neon yellow border
 
+          // Neon-style Final Score title
           const gameOverText = this.add
-            .text(400, 280, `Final Score: ${finalScore}`, {
-              fontSize: "32px",
-              fill: "#ffff66",
+            .text(400, 260, `Final Score: ${finalScore}`, {
+              fontSize: "36px",
+              fill: "#fd4634", // neon yellow
               stroke: "#000",
-              strokeThickness: 4,
-              backgroundColor: "#000",
+              strokeThickness: 6,
+              fontFamily: "Arial Black",
+              shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: "#000",
+                blur: 6,
+                fill: true,
+              },
               padding: { x: 20, y: 10 },
             })
             .setOrigin(0.5)
-            .setDepth(10);
+            .setDepth(11);
 
+          // Restart instructions
           const restartHint = this.add
-            .text(400, 340, `Press Enter or Click to restart`, {
+            .text(400, 325, `Press ENTER or Click to Restart`, {
               fontSize: "18px",
-              fill: "#ffffff",
+              fill: "#fdf77b",
               stroke: "#000",
               strokeThickness: 3,
+              fontFamily: "Arial",
+              shadow: {
+                offsetX: 1,
+                offsetY: 1,
+                color: "#000",
+                blur: 4,
+                fill: true,
+              },
             })
             .setOrigin(0.5)
-            .setDepth(10);
+            .setDepth(11);
 
-          // Prevent accidental double-trigger
+          // Fade-in animation
+          [panel, gameOverText, restartHint].forEach((obj) => {
+            obj.setAlpha(0);
+            this.tweens.add({
+              targets: obj,
+              alpha: 1,
+              duration: 600,
+              ease: "Sine.easeInOut",
+            });
+          });
+
+          gameOverText.setScale(0);
+          this.tweens.add({
+            targets: gameOverText,
+            scaleX: 1,
+            scaleY: 1,
+            ease: "Back.Out",
+            duration: 600,
+            delay: 200,
+          });
+
+          // Wait a moment, then allow restart
           this.time.delayedCall(1000, () => {
-            this.input.keyboard.removeAllListeners("keydown-ENTER");
-            this.input.removeAllListeners("pointerdown");
-
             this.input.keyboard.once("keydown-ENTER", () => {
               if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
               this.scene.restart();
             });
-
             this.input.once("pointerdown", () => {
               if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
               this.scene.restart();
@@ -620,18 +854,54 @@
 
         startGame() {
           this.startText.destroy();
+          // Start Game animation
+          this.tweens.add({
+            targets: this.logo,
+            y: this.logo.y - 100,
+            scaleX: 0,
+            scaleY: 0,
+            alpha: 0,
+            duration: 600,
+            ease: "Cubic.easeIn",
+            onComplete: () => {
+              this.logo.destroy();
+            },
+          });
+          this.tweens.add({
+            targets: this.startText,
+            alpha: 0,
+            duration: 400,
+            onComplete: () => {
+              this.startText.destroy();
+            },
+          });
+          this.sound.play("dash");
           this.gameStarted = true;
+
           // Stop menu intro music if it's playing
           if (menuIntroMusic && menuIntroMusic.isPlaying) {
             menuIntroMusic.stop();
           }
-          if (!bgMusic || !bgMusic.isPlaying) {
-            bgMusic = this.sound.add("bgMusic", {
-              loop: true,
-              volume: 1,
-            });
-            bgMusic.play();
+
+          // Stop any existing background music
+          if (bgMusic && bgMusic.isPlaying) {
+            bgMusic.stop();
           }
+
+          // Select and play the current track
+          const selectedTrack = allTracks[currentTrackIndex] || {
+            key: "bgMusic",
+            name: "Default Track",
+          };
+          bgMusic = this.sound.add(selectedTrack.key, {
+            loop: true,
+            volume: musicMuted ? 0 : 1,
+          });
+          bgMusic.play();
+
+          this.showTrackLabel(selectedTrack.name);
+
+          this.showTrackLabel(selectedTrack.name);
 
           this.startTime = this.time.now;
 
@@ -640,8 +910,6 @@
 
           // Show UI
           this.player.setVisible(true);
-          //this.ammoText.setVisible(true); //Debbuging
-          //this.healthText.setVisible(true); //Debbuging
           this.scoreText.setVisible(true);
 
           // Crate & health spawn loops
@@ -718,12 +986,11 @@
             now - this.lastDashTime > this.dashCooldown
           ) {
             this.isDashing = true;
+            this.isInvincible = true;
             this.lastDashTime = now;
+
             this.dashSound.play(); // Play dash sound
-            this.player.setAlpha(0.5); // Optional: make player semi-transparent while dashing
-            this.time.delayedCall(this.dashDuration, () => {
-              this.player.setAlpha(1); // Reset alpha after dash
-            });
+            this.player.setAlpha(0.5); // Make player semi-transparent while dashing
 
             let dashX = 0;
             let dashY = 0;
@@ -745,13 +1012,20 @@
                 dashX * this.dashSpeed,
                 dashY * this.dashSpeed
               );
-
-              this.time.delayedCall(this.dashDuration, () => {
-                this.isDashing = false;
-              });
-            } else {
-              this.isDashing = false;
             }
+
+            // End dash & invincibility after duration
+            this.time.delayedCall(this.dashDuration, () => {
+              this.isDashing = false;
+              this.player.setAlpha(1);
+
+              // Keep invincibility for extra time after dash
+              this.time.delayedCall(200, () => {
+                //Change the number to increase the invincibility time
+                this.isInvincible = false;
+                console.log("Invincibility ended.");
+              });
+            });
           }
 
           // NORMAL MOVEMENT
@@ -780,6 +1054,7 @@
             }
           }
 
+          // Bullet shooting logic
           this.shootBullet(time);
         }
 
@@ -1054,6 +1329,8 @@
         }
 
         enemyHitsPlayer(player, enemy) {
+          if (this.isInvincible) return; // Ignore collisions while dashing
+
           enemy.destroy();
           this.health -= 20;
           this.hurtSound.play();
