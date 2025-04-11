@@ -192,6 +192,9 @@
 
           this.lights.enable().setAmbientColor(0x222222); // Enable lights
 
+          this.tombstone = null;
+          this.tombstoneExploded = false; // Flag to prevent multiple explosions
+
           // Background music
           if (!this.sound.get("bgMusic")) {
             this.bgMusic = this.sound.add("bgMusic", {
@@ -531,8 +534,9 @@
 
         showGameOver(finalScore) {
           const panel = this.add
-            .rectangle(400, 300, 500, 200, 0x000000, 0.7)
-            .setOrigin(0.5);
+            .rectangle(400, 300, 500, 200, 0x000000, 0.3) //Last number is the alpha
+            .setOrigin(0.5)
+            .setDepth(10);
 
           const gameOverText = this.add
             .text(400, 280, `Final Score: ${finalScore}`, {
@@ -543,7 +547,8 @@
               backgroundColor: "#000",
               padding: { x: 20, y: 10 },
             })
-            .setOrigin(0.5);
+            .setOrigin(0.5)
+            .setDepth(10);
 
           const restartHint = this.add
             .text(400, 340, `Press Enter or Click to restart`, {
@@ -552,7 +557,8 @@
               stroke: "#000",
               strokeThickness: 3,
             })
-            .setOrigin(0.5);
+            .setOrigin(0.5)
+            .setDepth(10);
 
           // Prevent instant restart via mouse by adding delay
           this.time.delayedCall(1000, () => {
@@ -1037,7 +1043,7 @@
               "tombstone"
             );
             tombstone.setScale(0.6);
-            tombstone.setDepth(5);
+            tombstone.setDepth(1);
             tombstone.setAlpha(0);
             tombstone.setPipeline("Light2D"); // <- This is the key line
 
