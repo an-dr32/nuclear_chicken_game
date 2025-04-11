@@ -161,6 +161,7 @@
           this.load.image("crate", "assets/crate.png");
           this.load.image("health", "assets/health.png");
           this.load.image("spark", "assets/spark.png");
+          this.load.image("tombstone", "assets/tombstone.png");
 
           this.load.image("bulletIcon", "assets/ui/ammo.png");
 
@@ -188,6 +189,8 @@
           this.afterimageGroup = this.add.group(); // Create a group for afterimages
 
           this.input.mouse.disableContextMenu(); // Disable right-click context menu
+
+          this.lights.enable().setAmbientColor(0x222222); // Enable lights
 
           // Background music
           if (!this.sound.get("bgMusic")) {
@@ -523,6 +526,45 @@
             onComplete: () => {
               label.destroy();
             },
+          });
+        }
+
+        showGameOver(finalScore) {
+          const panel = this.add
+            .rectangle(400, 300, 500, 200, 0x000000, 0.7)
+            .setOrigin(0.5);
+
+          const gameOverText = this.add
+            .text(400, 280, `Final Score: ${finalScore}`, {
+              fontSize: "32px",
+              fill: "#ffff66",
+              stroke: "#000",
+              strokeThickness: 4,
+              backgroundColor: "#000",
+              padding: { x: 20, y: 10 },
+            })
+            .setOrigin(0.5);
+
+          const restartHint = this.add
+            .text(400, 340, `Press Enter or Click to restart`, {
+              fontSize: "18px",
+              fill: "#ffffff",
+              stroke: "#000",
+              strokeThickness: 3,
+            })
+            .setOrigin(0.5);
+
+          // Prevent instant restart via mouse by adding delay
+          this.time.delayedCall(1000, () => {
+            // Allow restart via ENTER
+            this.input.keyboard.once("keydown-ENTER", () => {
+              this.scene.restart();
+            });
+
+            // Allow restart via mouse click
+            this.input.once("pointerdown", () => {
+              this.scene.restart();
+            });
           });
         }
 
@@ -980,8 +1022,51 @@
           // === Shake the camera when the player is hit ===
           this.cameras.main.shake(150, 0.01); // Shake for 150ms with intensity of 0.01
 
+          // Player looses logic
           if (this.health <= 0) {
-            this.scene.restart();
+            this.gameStarted = false;
+
+            // Hide player sprite
+            this.player.setVisible(false);
+            this.player.setVelocity(0);
+
+            // Place tombstone where player died
+            const tombstone = this.add.image(
+              this.player.x,
+              this.player.y,
+              "tombstone"
+            );
+            tombstone.setScale(0.6);
+            tombstone.setDepth(5);
+            tombstone.setAlpha(0);
+            tombstone.setPipeline("Light2D"); // <- This is the key line
+
+            // Fade in the tombstone
+            this.tweens.add({
+              targets: tombstone,
+              alpha: 1,
+              duration: 600,
+              ease: "Power2",
+            });
+
+            // Add glowing light
+            const light = this.lights
+              .addLight(tombstone.x, tombstone.y - 10, 100)
+              .setColor(0xffffaa)
+              .setIntensity(0.8);
+
+            // Optional pulsing effect
+            this.tweens.add({
+              targets: light,
+              intensity: { from: 0.5, to: 1.5 },
+              duration: 1000,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+            });
+
+            // Show game over screen
+            this.showGameOver(this.score);
           }
         }
 
