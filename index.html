@@ -121,18 +121,21 @@
           </li>
           <li>
             <img src="assets/bullet.png" alt="Bullet icon" />
-            <span>Shoot with the Spacebar<br> or Right-Click Mouse</span>
+            <span
+              >Shoot with the Spacebar<br />
+              or Right-Click Mouse</span
+            >
           </li>
           <li>
             <img src="assets/player.png" alt="Health icon" />
             <span> Press CTRL to dash</span>
           </li>
+          <li></li>
           <li>
-            <li>
-              <img src="assets/music.png" alt="Health icon" />
-              <span> Press P to switch the music or M to mute!</span>
-            </li>
-            <li>
+            <img src="assets/music.png" alt="Health icon" />
+            <span> Press P to switch the music or M to mute!</span>
+          </li>
+          <li>
             <img src="assets/health.png" alt="Health icon" />
             <span>Pick up health packs</span>
           </li>
@@ -223,7 +226,11 @@
           ];
 
           // add your track keys
-          currentTrackIndex = 0; // default track
+          const savedIndex = localStorage.getItem("selectedTrackIndex");
+          currentTrackIndex = savedIndex !== null ? parseInt(savedIndex) : 0;
+
+          const savedMuted = localStorage.getItem("musicMuted");
+          musicMuted = savedMuted === "true"; // convert string to boolean
 
           // Optional: display current track
           this.trackLabel = this.add
@@ -240,6 +247,7 @@
 
             // Increment and loop back to start
             currentTrackIndex = (currentTrackIndex + 1) % allTracks.length;
+            localStorage.setItem("selectedTrackIndex", currentTrackIndex);
 
             // Stop and destroy the current music safely
             if (bgMusic) {
@@ -263,6 +271,7 @@
 
           this.input.keyboard.on("keydown-M", () => {
             musicMuted = !musicMuted;
+            localStorage.setItem("musicMuted", musicMuted); // ✅ Save mute status
 
             if (bgMusic) {
               bgMusic.setVolume(musicMuted ? 0 : 1);
@@ -1148,10 +1157,23 @@
           const dy = this.player.y - y;
           const angle = Math.atan2(dy, dx);
 
-          const speed = Math.min(
-            this.enemyBaseSpeed + this.score * 2,
-            this.enemyMaxSpeed
+          // Slow down small enemies — smaller = slower
+          const scaleFactor = Phaser.Math.Clamp(randomScale, 0.3, 0.8);
+          const sizeSpeedFactor = Phaser.Math.Linear(0.6, 1.0, scaleFactor);
+          // 0.3 scale = 60% speed, 0.8 scale = 100% speed
+
+          const baseSpeed = this.enemyBaseSpeed + this.score * 2;
+
+          // Invert scale so smaller = faster (up to 1.2x speed)
+          const relativeSpeed = Phaser.Math.Linear(
+            1.2,
+            1.0,
+            (randomScale - 0.3) / (0.8 - 0.3)
           );
+          // 0.3 scale → 1.2x speed | 0.8 scale → 1.0x speed
+
+          const speed = Math.min(baseSpeed * relativeSpeed, this.enemyMaxSpeed);
+
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
 
@@ -1275,8 +1297,14 @@
           bullet.destroy();
           enemy.destroy();
 
-          this.score += 10;
+          // Determine score based on enemy size
+          const scale = enemy.scaleX; // assume uniform scale
+          const points = scale < 0.5 ? 50 : 10;
+          this.score += points;
           this.scoreText.setText("Score: " + this.score);
+
+          // Optional: show points as floating text
+          this.showFloatingText(enemy.x, enemy.y, `+${points}`, "#ffffff");
 
           // Track kills toward current wave
           this.waveKills++;
@@ -1284,16 +1312,34 @@
             this.advanceWave();
           }
 
-          // Adjust spawn speed every 50 points
-          if (this.score % 50 === 0) {
+          // Adjust spawn speed every 200 points
+          if (this.score % 200 === 0) {
             this.enemySpawnRate = Math.max(300, this.enemySpawnRate - 100);
 
             // Adjust crate spawn delay (max 15s, min 3s)
+            /* // crates spawn slower as the player’s score increases
             this.crateSpawnDelay = Phaser.Math.Clamp(
               5000 + this.score * 100,
               3000,
               30000
+            ); */
+            // crates spawn faster as the player’s score increases
+            if (this.score <= 100) {
+              // From 10s to 5s as score increases to 100
+              this.crateSpawnDelay = 10000 - (this.score / 100) * 5000;
+            } else {
+              // From 5s to 3s as score increases from 100 to 500
+              const extra = Math.min(this.score - 100, 400); // max 400 points after 100
+              this.crateSpawnDelay = 5000 - (extra / 400) * 2000;
+            }
+
+            // Clamp final value just in case
+            this.crateSpawnDelay = Phaser.Math.Clamp(
+              this.crateSpawnDelay,
+              3000,
+              10000
             );
+
             this.crateSpawnEvent.delay = this.crateSpawnDelay;
 
             this.enemySpawnTimer.remove(false); // remove old timer
