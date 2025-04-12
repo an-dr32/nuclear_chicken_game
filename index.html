@@ -128,7 +128,7 @@
           </li>
           <li>
             <img src="assets/player.png" alt="Health icon" />
-            <span> Press CTRL to dash</span>
+            <span> Press CTRL or B to dash</span>
           </li>
           <li></li>
           <li>
@@ -421,6 +421,7 @@
             down: Phaser.Input.Keyboard.KeyCodes.S,
             left: Phaser.Input.Keyboard.KeyCodes.A,
             right: Phaser.Input.Keyboard.KeyCodes.D,
+            dash: Phaser.Input.Keyboard.KeyCodes.B,
           });
 
           //Dash Mechanic
@@ -990,7 +991,8 @@
 
           // DASH INPUT
           if (
-            Phaser.Input.Keyboard.JustDown(this.shiftKey) &&
+            (Phaser.Input.Keyboard.JustDown(this.shiftKey) ||
+              Phaser.Input.Keyboard.JustDown(this.wasd.dash)) &&
             !this.isDashing &&
             now - this.lastDashTime > this.dashCooldown
           ) {
