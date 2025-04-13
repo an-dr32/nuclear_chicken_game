@@ -1,6 +1,6 @@
 # 🐔 Nuclear Chick-EN: The Bullet-Hell Breakfast Battle
 
-***<<SHOW US YOUR TOP SCORE IN THE SCORES THREAD IN ISSUES>>>***
+***SHOW US YOUR TOP SCORE IN THE SCORES THREAD IN ISSUES***
 
 Welcome to **Nuclear Chick-EN**, the fast-paced top-down shooter where one genetically-enhanced chicken must defeat waves of mutant sheep in a desperate fight for the future of breakfast, supper, and dinner.
 
