@@ -59,7 +59,7 @@ Everything lives in one HTML file for now:
 1. Clone this repo:
 
    ```bash
-   git clone https://github.com/your-username/nuclear-chick-en.git
+   git clone https://github.com/an-dr32/nuclear_chicken_game.git
    cd nuclear-chick-en
 
 2. You'll need a local server (recommended for audio + performance):
