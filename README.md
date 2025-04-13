@@ -66,7 +66,7 @@ Everything lives in one HTML file for now:
 
    ```bash
        npx http-server
-    
+
 4. Then visit http://localhost:8080
 
 
