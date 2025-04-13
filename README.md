@@ -71,46 +71,46 @@ Everything lives in one HTML file for now:
 🐣 Customization & Hacking
 Want to make it your own?
 
-Change the background? Swap out assets/background.png.
+  Change the background? Swap out assets/background.png.
 
-Add power-ups? See spawnCrate() and collectCrate().
+  Add power-ups? See spawnCrate() and collectCrate().
 
-Make it rain bacon? You're the boss now.
+  Make it rain bacon? You're the boss now.
 
-Add your own soundtrack? Replace the MP3s in /assets/sounds/ and update the allTracks array.
+  Add your own soundtrack? Replace the MP3s in /assets/sounds/ and update the allTracks array.
 
 💀 Victory & Game Over
 You lose when your chicken runs out of health.
 
-A tombstone marks your sacrifice.
+  A tombstone marks your sacrifice.
 
 But hey, there's always one more round.
 
 📦 Assets
 Sprites and sound effects are a mix of original and AI Generated art.
 
-Make sure to replace these if you’re planning to publish your own version.
+  Make sure to replace these if you’re planning to publish your own version.
 
 ❤️ Credits & Shoutouts
 Game design: Andres DM AKA Logg3r
 
-Built with: Phaser 3
+  Built with: Phaser 3
 
-Soundtrack: Chiptune Madness by musicful.ai
+  Soundtrack: Chiptune Madness by musicful.ai
 
 Special thanks to: Me, Myself, and I
 
 🧪 TODO (For Contributors)
- Add boss enemies every 10 waves
+   Add boss enemies every 10 waves
 
- Upgrade weapons system
+   Upgrade weapons system
 
- Mobile support
+   Mobile support
 
- Juice it up with screen shake and camera bobbing
+   Juice it up with screen shake and camera bobbing
 
- Use Electron to create a playable game without the need of a server.
+   Use Electron to create a playable game without the need of a server.
 
-Default copyright laws, apply, meaning
+***Default copyright laws, apply, meaning
 The owner of this repository retains all rights, to the source code and no one may reproduce, 
-distribute, or create derivative works from this repository, without express consent.
+distribute, or create derivative works from this repository, without express consent.***
