@@ -3,6 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <title>Nuclear Chick-EN</title>
+    <!-- Standard favicon (ICO) -->
+    <link rel="icon" href="assets/favicon/favicon.ico" type="image/x-icon" />
+
+    <!-- PNG icons -->
+    <link rel="icon" sizes="32x32" href="assets/favicon/favicon-32x32.png" />
+    <link rel="icon" sizes="16x16" href="assets/favicon/favicon-16x16.png" />
+
+    <!-- Apple -->
+    <link rel="apple-touch-icon" href="assets/favicon/apple-touch-icon.png" />
+
+    <!-- Android -->
+    <link
+      rel="icon"
+      sizes="192x192"
+      href="assets/favicon/android-chrome-192x192.png"
+    />
+
     <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
     <style>
       /* Basic reset and fonts */
@@ -175,11 +192,11 @@
           this.load.image("health", "assets/health.png");
           this.load.image("spark", "assets/spark.png");
           this.load.image("tombstone", "assets/tombstone.png");
-          this.load.image("aim", "assets/cursor_aim.png");
+          this.load.image("aim", "assets/ui/cursor_aim.png");
 
           this.load.image("logo", "assets/ui/logoFinal.png");
 
-          this.load.image("bulletIcon", "assets/ui/ammo.png");
+          this.load.image("bulletIcon", "assets/bullet.png");
 
           this.load.audio("fire", "assets/sounds/fire.mp3");
           this.load.audio("pickup", "assets/sounds/pickup.mp3");
@@ -468,6 +485,10 @@
             defaultKey: "health",
             runChildUpdate: true,
           });
+          // Smoother movement
+          this.player.setDamping(true);
+          this.player.setDrag(0.1); // Smooth deceleration
+          this.player.setMaxVelocity(this.playerSpeed);
 
           this.cursors = this.input.keyboard.createCursorKeys();
           this.spaceBar = this.input.keyboard.addKey(
@@ -1003,9 +1024,13 @@
             this.dashSound.play(); // Play dash sound
             this.player.setAlpha(0.5); // Make player semi-transparent while dashing
 
+            // Temporarily set max velocity to allow faster movement during the dash
+            this.player.setMaxVelocity(this.dashSpeed);
+
             let dashX = 0;
             let dashY = 0;
 
+            // Determine dash direction based on input
             if (this.cursors.left.isDown || this.wasd.left.isDown) dashX = -1;
             else if (this.cursors.right.isDown || this.wasd.right.isDown)
               dashX = 1;
@@ -1014,11 +1039,13 @@
             else if (this.cursors.down.isDown || this.wasd.down.isDown)
               dashY = 1;
 
+            // Normalize direction to avoid diagonal speed issues
             const magnitude = Math.hypot(dashX, dashY);
             if (magnitude > 0) {
               dashX /= magnitude;
               dashY /= magnitude;
 
+              // Set dash velocity
               this.player.setVelocity(
                 dashX * this.dashSpeed,
                 dashY * this.dashSpeed
@@ -1030,9 +1057,11 @@
               this.isDashing = false;
               this.player.setAlpha(1);
 
+              // Reset max velocity back to normal after dash
+              this.player.setMaxVelocity(this.playerSpeed);
+
               // Keep invincibility for extra time after dash
               this.time.delayedCall(200, () => {
-                //Change the number to increase the invincibility time
                 this.isInvincible = false;
                 console.log("Invincibility ended.");
               });
@@ -1044,7 +1073,7 @@
             const healthFactor = this.health / this.maxHealth;
             const adjustedSpeed = this.playerSpeed * (0.6 + 0.4 * healthFactor);
 
-            // Horizontal
+            // Horizontal movement
             if (this.cursors.left.isDown || this.wasd.left.isDown) {
               this.player.setVelocityX(-adjustedSpeed);
               this.player.setFlipX(true);
@@ -1055,7 +1084,7 @@
               this.player.setVelocityX(0);
             }
 
-            // Vertical
+            // Vertical movement
             if (this.cursors.up.isDown || this.wasd.up.isDown) {
               this.player.setVelocityY(-adjustedSpeed);
             } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
