@@ -818,17 +818,9 @@
           });
         }
 
-        gameOver() {
-          // Stop the timer when the game is over
-          if (this.timerEvent) {
-            this.timerEvent.remove(); // Stops the timer event
-          }
-
-          // You can add any other game over logic here, like showing a game over screen.
-          console.log("Game Over!");
-        }
-
         showGameOver(finalScore) {
+          this.gameOver(); // ✅ Ensure timer is stopped immediately
+
           // Stop game music and resume menu music
           if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
           if (menuIntroMusic && !menuIntroMusic.isPlaying)
@@ -967,9 +959,16 @@
           });
           this.sound.play("dash");
           this.gameStarted = true;
+
+          // Ensure no old timer exists
+          if (this.timerEvent) {
+            this.timerEvent.remove();
+            this.timerEvent = null;
+          }
+
           // Add one point every second
           this.timerEvent = this.time.addEvent({
-            delay: 1000, // 1 second
+            delay: 1000,
             callback: () => {
               this.score += 1;
               this.scoreText.setText("Score: " + this.score);
@@ -1491,6 +1490,14 @@
           });
 
           // Optionally: add visual/sound cue for wave change
+        }
+
+        gameOver() {
+          console.log("GameOver triggered"); // Add this
+          if (this.timerEvent) {
+            this.timerEvent.remove();
+            console.log("Timer stopped"); // Add this too
+          }
         }
 
         enemyHitsPlayer(player, enemy) {
