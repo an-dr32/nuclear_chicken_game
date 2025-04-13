@@ -27,7 +27,7 @@
         margin: 0;
         padding: 0;
         background: #000;
-        font-family: "Courier New", monospace;
+        font-family: Consolas, monospace;
         color: white;
         min-height: 100vh;
         display: flex;
@@ -61,9 +61,23 @@
       /* Header title */
       header {
         text-align: center;
-        padding: 20px 0 0;
+        font-family: Consolas, monospace bolder;
+        margin-bottom: -120px;
+        margin-top: -150px;
         color: #00ffcc;
         font-size: 2.5rem;
+      }
+
+      .logo {
+        background: url("assets/ui/favicon.png") no-repeat center center;
+        background-size: contain;
+        width: 500px;
+        height: 500px;
+        text-indent: -9999px;
+        overflow: hidden;
+        white-space: nowrap;
+        margin: 0 auto; /* center block element */
+        display: block;
       }
 
       /* Layout between canvas and instructions */
@@ -87,7 +101,7 @@
       /* Phaser canvas style */
       canvas {
         box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.6);
-        background: #000;
+        background: #000000ac;
         padding: 18px;
         border-radius: 8px;
       }
@@ -121,11 +135,34 @@
         margin-right: 10px;
         image-rendering: pixelated;
       }
+
+      .site-footer {
+        text-align: center;
+        padding: 2px;
+        font-size: 14px;
+        color: #aeaeae;
+        background-color: #0000006f; /* optional light background */
+        border-top: 1px solid #343030; /* optional top border */
+      }
+
+      .site-footer a {
+        color: #007acc; /* or whatever color fits your theme */
+        text-decoration: none;
+      }
+
+      .site-footer a:hover {
+        text-decoration: underline;
+      }
+
+      .made-by {
+        display: inline-block;
+        margin-top: 4px; /* Adjust spacing here */
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>Nuclear Chick-EN</h1>
+      <h1 class="logo">Nuclear Chick-EN</h1>
     </header>
 
     <main class="layout">
@@ -172,6 +209,18 @@
       </section>
     </main>
 
+    <footer class="site-footer">
+      <p>
+        <a
+          href="https://github.com/an-dr32/nuclear_chicken_game.git"
+          target="_blank"
+        >
+          https://github.com/an-dr32/nuclear_chicken_game.git
+        </a>
+        <br />
+        <span class="made-by">Made by: Andres DM AKA L0gg3r</span>
+      </p>
+    </footer>
     <script>
       let bgMusic = null;
       let menuIntroMusic = null;
@@ -477,6 +526,10 @@
             .sprite(400, 300, "player")
             .setVisible(false);
           this.player.setCollideWorldBounds(true);
+          // Smoother movement
+          this.player.setDamping(true);
+          this.player.setDrag(0.1); // Smooth deceleration
+          this.player.setMaxVelocity(this.playerSpeed);
 
           this.bullets = this.physics.add.group();
           this.enemies = this.physics.add.group();
@@ -485,10 +538,6 @@
             defaultKey: "health",
             runChildUpdate: true,
           });
-          // Smoother movement
-          this.player.setDamping(true);
-          this.player.setDrag(0.1); // Smooth deceleration
-          this.player.setMaxVelocity(this.playerSpeed);
 
           this.cursors = this.input.keyboard.createCursorKeys();
           this.spaceBar = this.input.keyboard.addKey(
@@ -769,6 +818,16 @@
           });
         }
 
+        gameOver() {
+          // Stop the timer when the game is over
+          if (this.timerEvent) {
+            this.timerEvent.remove(); // Stops the timer event
+          }
+
+          // You can add any other game over logic here, like showing a game over screen.
+          console.log("Game Over!");
+        }
+
         showGameOver(finalScore) {
           // Stop game music and resume menu music
           if (bgMusic && bgMusic.isPlaying) bgMusic.stop();
@@ -908,6 +967,16 @@
           });
           this.sound.play("dash");
           this.gameStarted = true;
+          // Add one point every second
+          this.timerEvent = this.time.addEvent({
+            delay: 1000, // 1 second
+            callback: () => {
+              this.score += 1;
+              this.scoreText.setText("Score: " + this.score);
+            },
+            callbackScope: this,
+            loop: true,
+          });
 
           // Stop menu intro music if it's playing
           if (menuIntroMusic && menuIntroMusic.isPlaying) {
@@ -1007,6 +1076,11 @@
 
         update(time, delta) {
           if (!this.gameStarted) return;
+          this.player.rotation = Phaser.Math.Clamp(
+            this.player.body.velocity.x * 0.001,
+            -0.1,
+            0.1
+          );
 
           const now = time;
 
@@ -1052,10 +1126,24 @@
               );
             }
 
+            // Spin the player 360 degrees during the dash
+            this.tweens.addCounter({
+              from: 0,
+              to: 360,
+              duration: this.dashDuration,
+              ease: "Linear",
+              onUpdate: (tween) => {
+                const value = tween.getValue();
+                this.player.rotation = Phaser.Math.DegToRad(value);
+              },
+            });
+
             // End dash & invincibility after duration
             this.time.delayedCall(this.dashDuration, () => {
               this.isDashing = false;
               this.player.setAlpha(1);
+              this.player.angle = 0; // Reset rotation after spin
+              this.player.rotation = 0;
 
               // Reset max velocity back to normal after dash
               this.player.setMaxVelocity(this.playerSpeed);
@@ -1330,7 +1418,7 @@
 
           // Determine score based on enemy size
           const scale = enemy.scaleX; // assume uniform scale
-          const points = scale < 0.5 ? 50 : 10;
+          const points = scale < 0.5 ? 100 : scale < 0.7 ? 50 : 10; //if scale of the enemy is lower than half the size, you get 100 points, a third 50, otherwise 10
           this.score += points;
           this.scoreText.setText("Score: " + this.score);
 
@@ -1429,6 +1517,7 @@
           // Player looses logic
           if (this.health <= 0) {
             this.gameStarted = false;
+            this.gameOver(); // Call game over when health runs out
 
             // Hide player sprite
             this.player.setVisible(false);
