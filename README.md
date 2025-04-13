@@ -65,7 +65,7 @@ Everything lives in one HTML file for now:
 2. You'll need a local server (recommended for audio + performance):
 
    ```bash
-       npx http-server
+   npx http-server
 
 4. Then visit http://localhost:8080
 
