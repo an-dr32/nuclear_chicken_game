@@ -110,3 +110,7 @@ Special thanks to: Me, Myself, and I
  Juice it up with screen shake and camera bobbing
 
  Use Electron to create a playable game without the need of a server.
+
+Default copyright laws, apply, meaning
+The owner of this repository retains all rights, to the source code and no one may reproduce, 
+distribute, or create derivative works from this repository, without express consent.
