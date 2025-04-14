@@ -183,7 +183,7 @@
           </li>
           <li>
             <img src="assets/player.png" alt="Health icon" />
-            <span> Press CTRL or B to dash</span>
+            <span> Press CTRL, B or double press a WASD to dash</span>
           </li>
           <li></li>
           <li>
@@ -492,7 +492,7 @@
           });
 
           //Dash Mechanic
-          this.dashSpeed = 600; // Dash burst speed
+          this.dashSpeed = 1000; // Dash burst speed
           this.dashDuration = 300; // Duration of dash in ms
           this.dashCooldown = 1000; // Cooldown in ms
           this.isDashing = false;
@@ -544,6 +544,14 @@
           this.spaceBar = this.input.keyboard.addKey(
             Phaser.Input.Keyboard.KeyCodes.SPACE
           );
+
+          this.lastDirectionPress = {
+            left: 0,
+            right: 0,
+            up: 0,
+            down: 0,
+          };
+          this.doubleTapThreshold = 250; // milliseconds
 
           this.fireSound = this.sound.add("fire");
           this.pickupSound = this.sound.add("pickup");
@@ -1084,6 +1092,41 @@
 
           const now = time;
 
+          // Check for double-press dash
+          const directions = [
+            {
+              key: "left",
+              isDown: this.cursors.left.isDown || this.wasd.left.isDown,
+            },
+            {
+              key: "right",
+              isDown: this.cursors.right.isDown || this.wasd.right.isDown,
+            },
+            {
+              key: "up",
+              isDown: this.cursors.up.isDown || this.wasd.up.isDown,
+            },
+            {
+              key: "down",
+              isDown: this.cursors.down.isDown || this.wasd.down.isDown,
+            },
+          ];
+
+          directions.forEach((dir) => {
+            if (
+              Phaser.Input.Keyboard.JustDown(this.cursors[dir.key]) ||
+              Phaser.Input.Keyboard.JustDown(this.wasd[dir.key])
+            ) {
+              if (
+                now - this.lastDirectionPress[dir.key] <
+                this.doubleTapThreshold
+              ) {
+                this.triggerDash(dir.key);
+              }
+              this.lastDirectionPress[dir.key] = now;
+            }
+          });
+
           // DASH INPUT
           if (
             (Phaser.Input.Keyboard.JustDown(this.shiftKey) ||
@@ -1184,6 +1227,68 @@
 
           // Bullet shooting logic
           this.shootBullet(time);
+        }
+
+        triggerDash(direction) {
+          if (
+            this.isDashing ||
+            this.time.now - this.lastDashTime < this.dashCooldown
+          )
+            return;
+
+          this.isDashing = true;
+          this.isInvincible = true;
+          this.lastDashTime = this.time.now;
+
+          this.dashSound.play();
+          this.player.setAlpha(0.5);
+          this.player.setMaxVelocity(this.dashSpeed);
+
+          let dashX = 0;
+          let dashY = 0;
+
+          switch (direction) {
+            case "left":
+              dashX = -1;
+              break;
+            case "right":
+              dashX = 1;
+              break;
+            case "up":
+              dashY = -1;
+              break;
+            case "down":
+              dashY = 1;
+              break;
+          }
+
+          this.player.setVelocity(
+            dashX * this.dashSpeed,
+            dashY * this.dashSpeed
+          );
+
+          // Spin effect (optional)
+          this.tweens.addCounter({
+            from: 0,
+            to: 360,
+            duration: this.dashDuration,
+            ease: "Linear",
+            onUpdate: (tween) => {
+              const value = tween.getValue();
+              this.player.rotation = Phaser.Math.DegToRad(value);
+            },
+          });
+
+          this.time.delayedCall(this.dashDuration, () => {
+            this.isDashing = false;
+            this.player.setAlpha(1);
+            this.player.setMaxVelocity(this.playerSpeed);
+            this.player.rotation = 0;
+
+            this.time.delayedCall(200, () => {
+              this.isInvincible = false;
+            });
+          });
         }
 
         shootBullet(time) {
