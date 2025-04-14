@@ -498,6 +498,10 @@
           this.isDashing = false;
           this.lastDashTime = 0;
 
+          this.trailGroup = this.add.group();
+          this.lastTrailTime = 0;
+          this.trailCooldown = 50; // milliseconds between trails
+
           // Bind SHIFT key
           this.shiftKey = this.input.keyboard.addKey(
             Phaser.Input.Keyboard.KeyCodes.SHIFT
@@ -1223,10 +1227,34 @@
             } else {
               this.player.setVelocityY(0);
             }
+
+            if (
+              this.player.body.speed > 100 &&
+              time - this.lastTrailTime > this.trailCooldown
+            ) {
+              this.createTrail();
+              this.lastTrailTime = time;
+            }
           }
 
           // Bullet shooting logic
           this.shootBullet(time);
+        }
+
+        createTrail() {
+          const trail = this.add.image(this.player.x, this.player.y, "player");
+          trail.setAlpha(0.5);
+          trail.setRotation(this.player.rotation);
+          trail.setFlipX(this.player.flipX);
+          trail.setScale(this.player.scaleX * 0.8); // slightly smaller
+
+          this.tweens.add({
+            targets: trail,
+            alpha: 0,
+            scale: this.player.scaleX * 0.4,
+            duration: 500,
+            onComplete: () => trail.destroy(),
+          });
         }
 
         triggerDash(direction) {
